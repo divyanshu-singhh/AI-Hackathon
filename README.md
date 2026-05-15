@@ -1,189 +1,217 @@
 # AI Product Image Quality, Tagging & Rebuilder
 
-Hackathon MVP for product/catalog image parsing, quality auditing, background removal, clean image rebuilding, metadata generation, and CSV reporting.
+This project is a local Windows-friendly hackathon app for product image processing.
 
-The app has:
+It has:
 
-- FastAPI backend for image processing and reports.
-- React + Vite frontend for uploads and results.
-- Agent-style pipeline with selectable stages: quality, background removal, rebuild, vision analysis, and metadata generation. The frontend starts with local stages selected so LLM stages run only when you choose them.
-- Internal OpenAI-compatible LLM gateway support through environment variables only.
+- Backend: Python FastAPI
+- Frontend: React + Vite
+- Features: image upload, quality score, background removal, rebuilt image, optional LLM-based vision/metadata, CSV batch report
 
-## Project Structure
+## 1. Open PowerShell
 
-```text
-backend/      FastAPI API, agents, services, schemas, local storage
-frontend/     React + Vite dashboard
-scripts/      Setup, run, cleanup, and sample curl helpers
-references/   Gateway notes, prompts, schemas, demo script
-assets/       Sample CSV and image folder notes
-skill.md      Agent capability description
+Open PowerShell and go to the project folder:
+
+```powershell
+cd C:\Users\IndiaMart\Desktop\AI-Hackathon\ai-image-parser-agent
 ```
 
-## Requirements
+## 2. Backend Setup
 
-Install these first:
+Go to backend folder:
 
-- Python 3.10+
-- Node.js 18+
-- npm
-
-Optional:
-
-- Tesseract is not required.
-- `rembg` may download its model on first background-removal run, so the first request can be slower.
-
-## Backend Setup
-
-From the project root:
-
-```bash
+```powershell
 cd backend
+```
+
+Create virtual environment only if `.venv` does not already exist:
+
+```powershell
 python -m venv .venv
 ```
 
-Activate the virtual environment.
-
-Windows PowerShell:
+Activate it:
 
 ```powershell
-.venv\Scripts\Activate.ps1
+.\.venv\Scripts\Activate.ps1
 ```
 
-Git Bash / Linux / macOS:
+Install Python packages:
 
-```bash
-source .venv/bin/activate
+```powershell
+python -m pip install -r requirements.txt
 ```
 
-Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-Create the backend environment file:
-
-```bash
-cp ../.env.example .env
-```
-
-On Windows PowerShell:
+Create backend environment file:
 
 ```powershell
 Copy-Item ..\.env.example .env
 ```
 
-Edit `backend/.env`:
+Open `backend\.env` in Notepad:
+
+```powershell
+notepad .env
+```
+
+Set your LLM key:
 
 ```env
 IM_LLM_API_KEY=your_actual_access_key
-VISION_MODEL=openai/gpt-4o
-TEXT_MODEL=openai/gpt-4.1-mini
 ```
 
-Never commit `.env`.
+Save and close Notepad.
 
-## Run Backend
+## 3. Run Backend
 
-From `backend/` with the virtual environment active:
+In the same backend PowerShell window, run:
 
-```bash
+```powershell
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Health check:
+Keep this PowerShell window open.
 
-```bash
-curl http://localhost:8000/health
+Check backend in browser:
+
+```text
+http://localhost:8000/health
 ```
 
-Expected response:
+Expected result:
 
 ```json
 {"status":"ok","service":"ai-image-parser-agent"}
 ```
 
-## Frontend Setup
+## 4. Frontend Setup
 
-Open a second terminal:
+Open a second PowerShell window.
 
-```bash
-cd frontend
+Go to frontend folder:
+
+```powershell
+cd C:\Users\IndiaMart\Desktop\AI-Hackathon\ai-image-parser-agent\frontend
+```
+
+Install frontend packages:
+
+```powershell
 npm install
+```
+
+Run frontend:
+
+```powershell
 npm run dev
 ```
 
-Open:
+Keep this second PowerShell window open.
+
+Open the app in browser:
 
 ```text
 http://localhost:5173
 ```
 
-## Scripted Setup
+## 5. How To Use The App
 
-From the project root:
+1. Open `http://localhost:5173`.
+2. Select stages you want to run.
+3. Start with these safe local stages:
+   - Quality
+   - Remove BG
+   - Rebuild
+4. Select one product image.
+5. Click `Process Image`.
+6. Review original image, rebuilt image, quality score, issues, and suggestions.
 
-```bash
-bash scripts/setup_backend.sh
-bash scripts/setup_frontend.sh
-bash scripts/run_backend.sh
-bash scripts/run_frontend.sh
+Use `Vision` and `Metadata` stages only after `IM_LLM_API_KEY` is set in `backend\.env`.
+
+## 6. Common Problems
+
+### PowerShell blocks activation
+
+If this command fails:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
 ```
 
-## How To Use
+Run this once:
 
-1. Start the backend at `http://localhost:8000`.
-2. Start the frontend at `http://localhost:5173`.
-3. Pick the processing stages you want to run. Vision and metadata are optional LLM stages.
-4. Use one upload mode:
-   - Single image
-   - Multiple images
-   - CSV file
-   - Google Sheet CSV export URL
-5. Review original, background-removed, rebuilt image, quality score, objects, tags, issues, and suggestions.
-6. Download the generated CSV report for batch runs.
-
-## CSV Format
-
-Use this header:
-
-```csv
-image_name,image_url,expected_category,notes
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 ```
 
-Example:
+Then try activation again:
 
-```csv
-sample_chair,https://example.com/chair.jpg,Furniture,Demo row only
+```powershell
+.\.venv\Scripts\Activate.ps1
 ```
 
-## API Endpoints
+### Port already in use
 
-- `GET /health`
-- `POST /api/process-image`
-- `POST /api/process-images`
-- `POST /api/process-csv`
-- `POST /api/process-sheet-url`
-- `GET /api/reports/{report_name}`
+If port `8000` is busy, stop the old backend window or run:
 
-For upload endpoints, pass selected stages as a comma-separated form field:
+```powershell
+Get-NetTCPConnection -LocalPort 8000 | Select-Object OwningProcess
+```
+
+Then stop that process:
+
+```powershell
+Stop-Process -Id PROCESS_ID -Force
+```
+
+Replace `PROCESS_ID` with the number shown by the previous command.
+
+### Virtual environment already exists
+
+If `.venv` already exists, do not run `python -m venv .venv` again.
+
+Just activate it:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+Then install packages:
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
+## 7. Useful Test Commands
+
+Run backend test:
+
+```powershell
+cd C:\Users\IndiaMart\Desktop\AI-Hackathon\ai-image-parser-agent\backend
+.\.venv\Scripts\Activate.ps1
+pytest -q
+```
+
+Build frontend:
+
+```powershell
+cd C:\Users\IndiaMart\Desktop\AI-Hackathon\ai-image-parser-agent\frontend
+npm run build
+```
+
+## 8. Important Files
+
+- Backend main file: `backend\main.py`
+- Backend environment file: `backend\.env`
+- Frontend main UI: `frontend\src\App.jsx`
+- API client: `frontend\src\api\client.js`
+- Image pipeline: `backend\agents\orchestrator_agent.py`
+- Sample CSV: `assets\sample_batch.csv`
+
+## 9. Stop The App
+
+To stop backend or frontend, go to each PowerShell window and press:
 
 ```text
-stages=quality,background,rebuild,vision,metadata
+Ctrl + C
 ```
-
-## Notes For New Developers
-
-- The main pipeline is in `backend/agents/orchestrator_agent.py`.
-- LLM gateway calls are isolated in `backend/services/llm_client.py`.
-- Deterministic OpenCV quality checks are in `backend/services/quality_analyzer.py`.
-- Background removal has a fallback: if `rembg` fails, the app keeps processing.
-- If the LLM key is missing or the gateway fails, the app returns fallback metadata instead of crashing.
-
-## Known Limitations
-
-- Batch processing is synchronous for the hackathon MVP.
-- Very large batches should be moved to a queue/worker system later.
-- OCR is handled through the vision model; local OCR is not mandatory in this version.
-- CSV image URLs must be public and directly downloadable.
