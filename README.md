@@ -8,6 +8,7 @@ It has:
 - Frontend: React + Vite
 - Features: image upload, quality score, background removal, rebuilt image, optional LLM-based vision/metadata, CSV batch report
 - Live processing timeline showing current stage, percentage, model/tool name, model type, LLM token usage, and gateway cost when available
+- Output crop sizes: `125x125`, `250x250`, and `500x500`
 
 ## 1. Open PowerShell
 
@@ -141,10 +142,11 @@ http://localhost:5173
    - Quality
    - Remove BG
    - Rebuild
-4. Select one product image.
-5. Click `Process Image`.
-6. Watch the `Processing Timeline` table for current stage, percentage, model/tool used, and LLM token usage.
-7. Review original image, rebuilt image, quality score, issues, and suggestions.
+4. Select output crop size: `125x125`, `250x250`, or `500x500`.
+5. Select one product image.
+6. Click `Process Image`.
+7. Watch the `Processing Timeline` table for current stage, percentage, model/tool used, and LLM token usage.
+8. Review original image, rebuilt image, quality score, issues, and suggestions.
 
 Use `Vision` and `Metadata` stages only after `IM_LLM_API_KEY` is set in `backend\.env`.
 

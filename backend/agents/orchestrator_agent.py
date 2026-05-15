@@ -41,6 +41,7 @@ def process_image(
     expected_category: str | None = None,
     stages: set[str] | None = None,
     progress_job_id: str | None = None,
+    crop_size: int = 1000,
 ) -> dict[str, Any]:
     image_id = str(uuid.uuid4())
     selected_stages = stages or DEFAULT_STAGES
@@ -83,10 +84,11 @@ def process_image(
             _emit_stage(progress_job_id, "background", "skipped", message="Skipped by user")
 
         if "rebuild" in selected_stages:
-            _emit_stage(progress_job_id, "rebuild", "running", message="Building 1000x1000 clean catalog image")
+            _emit_stage(progress_job_id, "rebuild", "running", message=f"Building {crop_size}x{crop_size} clean catalog image")
             rebuilt_output = OUTPUT_DIR / f"{image_id}_rebuilt.png"
-            rebuild_catalog_image(bg_removed_path, rebuilt_output)
+            rebuild_catalog_image(bg_removed_path, rebuilt_output, crop_size, quality)
             result["rebuilt_image_url"] = storage_url("outputs", rebuilt_output.name)
+            result["crop_size"] = crop_size
             _emit_stage(progress_job_id, "rebuild", "completed", message="Catalog image rebuilt")
         else:
             _emit_stage(progress_job_id, "rebuild", "skipped", message="Skipped by user")
@@ -164,6 +166,7 @@ def _base_result(image_id: str, file_name: str, stages: set[str]) -> dict[str, A
         "suggestions": [],
         "raw_llm_analysis": {},
         "error": None,
+        "crop_size": None,
     }
 
 

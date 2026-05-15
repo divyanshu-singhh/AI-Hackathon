@@ -1,4 +1,5 @@
 import { Activity } from "lucide-react";
+import { useEffect, useRef } from "react";
 
 const STATUS_LABELS = {
   running: "Running",
@@ -8,10 +9,17 @@ const STATUS_LABELS = {
 };
 
 export default function ProgressTimeline({ events, connectionState }) {
+  const scrollRef = useRef(null);
   const latestByStage = collapseEvents(events);
   const rows = Object.values(latestByStage);
   const current = [...rows].reverse().find((row) => row.status === "running");
   const overallPercent = rows.length ? Math.max(...rows.map((row) => row.percent || 0)) : 0;
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [events.length]);
 
   return (
     <section className="timeline-section">
@@ -33,7 +41,7 @@ export default function ProgressTimeline({ events, connectionState }) {
       <div className="progress-bar" aria-label="Overall progress">
         <span style={{ width: `${overallPercent}%` }} />
       </div>
-      <div className="table-wrap">
+      <div className="table-wrap timeline-scroll" ref={scrollRef}>
         <table className="timeline-table">
           <thead>
             <tr>

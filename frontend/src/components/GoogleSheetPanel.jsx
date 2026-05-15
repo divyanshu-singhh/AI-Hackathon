@@ -3,7 +3,7 @@ import { useState } from "react";
 import { createJobId, processCsv, processSheetUrl, subscribeToProgress } from "../api/client.js";
 import Loader from "./Loader.jsx";
 
-export default function GoogleSheetPanel({ stages, onBatch, onProgressReset, onProgressEvent, onProgressState }) {
+export default function GoogleSheetPanel({ stages, cropSize, onBatch, onProgressReset, onProgressEvent, onProgressState }) {
   const [csvFile, setCsvFile] = useState(null);
   const [csvUrl, setCsvUrl] = useState("");
   const [loading, setLoading] = useState(false);
@@ -17,7 +17,7 @@ export default function GoogleSheetPanel({ stages, onBatch, onProgressReset, onP
     onProgressReset?.(jobId);
     const closeProgress = subscribeToProgress(jobId, onProgressEvent, onProgressState);
     try {
-      onBatch(await processCsv(csvFile, stages, jobId));
+      onBatch(await processCsv(csvFile, stages, jobId, cropSize));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -34,7 +34,7 @@ export default function GoogleSheetPanel({ stages, onBatch, onProgressReset, onP
     onProgressReset?.(jobId);
     const closeProgress = subscribeToProgress(jobId, onProgressEvent, onProgressState);
     try {
-      onBatch(await processSheetUrl(csvUrl.trim(), stages, jobId));
+      onBatch(await processSheetUrl(csvUrl.trim(), stages, jobId, cropSize));
     } catch (err) {
       setError(err.message);
     } finally {

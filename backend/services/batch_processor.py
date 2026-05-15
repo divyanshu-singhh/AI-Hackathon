@@ -12,6 +12,7 @@ def build_batch_response(
     paths: list[tuple[Path, str, str | None]],
     stages: set[str],
     progress_job_id: str | None = None,
+    crop_size: int = 1000,
 ) -> dict[str, Any]:
     batch_id = str(uuid.uuid4())
     results = [
@@ -21,6 +22,7 @@ def build_batch_response(
             expected_category=expected_category,
             stages=stages,
             progress_job_id=progress_job_id,
+            crop_size=crop_size,
         )
         for path, file_name, expected_category in paths
     ]

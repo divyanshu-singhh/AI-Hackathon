@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { createJobId, processSingleImage, subscribeToProgress } from "../api/client.js";
 import Loader from "./Loader.jsx";
 
-export default function UploadPanel({ stages, onResult, onProgressReset, onProgressEvent, onProgressState }) {
+export default function UploadPanel({ stages, cropSize, onResult, onProgressReset, onProgressEvent, onProgressState }) {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -17,7 +17,7 @@ export default function UploadPanel({ stages, onResult, onProgressReset, onProgr
     onProgressReset?.(jobId);
     const closeProgress = subscribeToProgress(jobId, onProgressEvent, onProgressState);
     try {
-      onResult(await processSingleImage(file, stages, jobId));
+      onResult(await processSingleImage(file, stages, jobId, cropSize));
     } catch (err) {
       setError(err.message);
     } finally {

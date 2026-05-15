@@ -3,7 +3,7 @@ import { useState } from "react";
 import { createJobId, processMultipleImages, subscribeToProgress } from "../api/client.js";
 import Loader from "./Loader.jsx";
 
-export default function BatchUploadPanel({ stages, onBatch, onProgressReset, onProgressEvent, onProgressState }) {
+export default function BatchUploadPanel({ stages, cropSize, onBatch, onProgressReset, onProgressEvent, onProgressState }) {
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -16,7 +16,7 @@ export default function BatchUploadPanel({ stages, onBatch, onProgressReset, onP
     onProgressReset?.(jobId);
     const closeProgress = subscribeToProgress(jobId, onProgressEvent, onProgressState);
     try {
-      onBatch(await processMultipleImages(files, stages, jobId));
+      onBatch(await processMultipleImages(files, stages, jobId, cropSize));
     } catch (err) {
       setError(err.message);
     } finally {

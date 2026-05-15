@@ -35,11 +35,12 @@ async function readJson(response) {
   return data;
 }
 
-export async function processSingleImage(file, stages, jobId) {
+export async function processSingleImage(file, stages, jobId, cropSize) {
   const formData = new FormData();
   formData.append("image", file);
   formData.append("stages", stageString(stages));
   if (jobId) formData.append("job_id", jobId);
+  if (cropSize) formData.append("crop_size", cropSize);
   const response = await fetch(`${API_BASE_URL}/api/process-image`, {
     method: "POST",
     body: formData
@@ -47,11 +48,12 @@ export async function processSingleImage(file, stages, jobId) {
   return readJson(response);
 }
 
-export async function processMultipleImages(files, stages, jobId) {
+export async function processMultipleImages(files, stages, jobId, cropSize) {
   const formData = new FormData();
   Array.from(files).forEach((file) => formData.append("images", file));
   formData.append("stages", stageString(stages));
   if (jobId) formData.append("job_id", jobId);
+  if (cropSize) formData.append("crop_size", cropSize);
   const response = await fetch(`${API_BASE_URL}/api/process-images`, {
     method: "POST",
     body: formData
@@ -59,11 +61,12 @@ export async function processMultipleImages(files, stages, jobId) {
   return readJson(response);
 }
 
-export async function processCsv(file, stages, jobId) {
+export async function processCsv(file, stages, jobId, cropSize) {
   const formData = new FormData();
   formData.append("csv_file", file);
   formData.append("stages", stageString(stages));
   if (jobId) formData.append("job_id", jobId);
+  if (cropSize) formData.append("crop_size", cropSize);
   const response = await fetch(`${API_BASE_URL}/api/process-csv`, {
     method: "POST",
     body: formData
@@ -71,11 +74,11 @@ export async function processCsv(file, stages, jobId) {
   return readJson(response);
 }
 
-export async function processSheetUrl(csvUrl, stages, jobId) {
+export async function processSheetUrl(csvUrl, stages, jobId, cropSize) {
   const response = await fetch(`${API_BASE_URL}/api/process-sheet-url`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ csv_url: csvUrl, stages: Array.from(stages || []), job_id: jobId })
+    body: JSON.stringify({ csv_url: csvUrl, stages: Array.from(stages || []), job_id: jobId, crop_size: cropSize })
   });
   return readJson(response);
 }

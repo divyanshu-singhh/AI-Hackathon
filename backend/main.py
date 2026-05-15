@@ -37,6 +37,7 @@ class SheetUrlRequest(BaseModel):
     csv_url: str
     stages: list[str] | None = None
     job_id: str | None = None
+    crop_size: int | None = None
 
 
 @app.get("/health")
@@ -67,6 +68,7 @@ async def process_single_image(
     image: Annotated[UploadFile, File()],
     stages: Annotated[str | None, Form()] = None,
     job_id: Annotated[str | None, Form()] = None,
+    crop_size: Annotated[int | None, Form()] = None,
 ) -> dict:
     try:
         temp_path = await save_upload_file(image)
@@ -76,6 +78,7 @@ async def process_single_image(
             image.filename or temp_path.name,
             stages=parse_stages(stages),
             progress_job_id=job_id,
+            crop_size=parse_crop_size(crop_size),
         )
     except Exception as exc:
         return {"status": "failed", "error": f"Unable to process image: {exc}"}
@@ -86,6 +89,7 @@ async def process_multiple_images(
     images: Annotated[list[UploadFile], File()],
     stages: Annotated[str | None, Form()] = None,
     job_id: Annotated[str | None, Form()] = None,
+    crop_size: Annotated[int | None, Form()] = None,
 ) -> dict:
     if len(images) > MAX_BATCH_SIZE:
         raise HTTPException(status_code=400, detail=f"Maximum batch size is {MAX_BATCH_SIZE}")
@@ -97,7 +101,7 @@ async def process_multiple_images(
             failed_path = Path(f"failed_{uuid.uuid4()}.jpg")
             paths.append((failed_path, image.filename or "upload.jpg", f"Upload failed: {exc}"))
     valid_paths = [(path, name, category) for path, name, category in paths if path.exists()]
-    response = await asyncio.to_thread(build_batch_response, valid_paths, parse_stages(stages), job_id)
+    response = await asyncio.to_thread(build_batch_response, valid_paths, parse_stages(stages), job_id, parse_crop_size(crop_size))
     upload_failures = [
         {
             "image_id": str(uuid.uuid4()),
@@ -128,11 +132,12 @@ async def process_csv(
     csv_file: Annotated[UploadFile, File()],
     stages: Annotated[str | None, Form()] = None,
     job_id: Annotated[str | None, Form()] = None,
+    crop_size: Annotated[int | None, Form()] = None,
 ) -> dict:
     try:
         temp_csv = await save_raw_upload(csv_file, ".csv")
         rows = pd.read_csv(temp_csv).fillna("").to_dict(orient="records")
-        return await asyncio.to_thread(process_csv_rows, rows, parse_stages(stages), job_id)
+        return await asyncio.to_thread(process_csv_rows, rows, parse_stages(stages), job_id, parse_crop_size(crop_size))
     except Exception as exc:
         return {"status": "failed", "error": f"Unable to process CSV: {exc}"}
 
@@ -145,7 +150,7 @@ def process_sheet_url(payload: SheetUrlRequest) -> dict:
         temp_csv = REPORT_DIR / f"sheet_{uuid.uuid4()}.csv"
         temp_csv.write_bytes(response.content)
         rows = pd.read_csv(temp_csv).fillna("").to_dict(orient="records")
-        return process_csv_rows(rows, set(payload.stages or DEFAULT_STAGES), payload.job_id)
+        return process_csv_rows(rows, set(payload.stages or DEFAULT_STAGES), payload.job_id, parse_crop_size(payload.crop_size))
     except Exception as exc:
         return {"status": "failed", "error": f"Unable to process sheet URL: {exc}"}
 
@@ -167,6 +172,10 @@ def parse_stages(raw: str | None) -> set[str]:
     return selected or set(DEFAULT_STAGES)
 
 
+def parse_crop_size(raw: int | None) -> int:
+    return raw if raw in {125, 250, 500, 1000} else 1000
+
+
 async def save_raw_upload(upload: UploadFile, expected_suffix: str) -> Path:
     suffix = Path(upload.filename or "").suffix.lower()
     if suffix != expected_suffix:
@@ -176,7 +185,7 @@ async def save_raw_upload(upload: UploadFile, expected_suffix: str) -> Path:
     return output_path
 
 
-def process_csv_rows(rows: list[dict], stages: set[str], job_id: str | None = None) -> dict:
+def process_csv_rows(rows: list[dict], stages: set[str], job_id: str | None = None, crop_size: int = 1000) -> dict:
     if len(rows) > MAX_BATCH_SIZE:
         raise ValueError(f"Maximum batch size is {MAX_BATCH_SIZE}")
 
@@ -194,7 +203,7 @@ def process_csv_rows(rows: list[dict], stages: set[str], job_id: str | None = No
         except Exception as exc:
             failed_results.append(_failed_csv_result(image_name, f"Download failed: {exc}", stages))
 
-    response = build_batch_response(paths, stages, job_id) if paths else {
+    response = build_batch_response(paths, stages, job_id, crop_size) if paths else {
         "batch_id": str(uuid.uuid4()),
         "total": 0,
         "success": 0,

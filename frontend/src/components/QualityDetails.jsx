@@ -1,3 +1,5 @@
+import { Info } from "lucide-react";
+
 export default function QualityDetails({ breakdown }) {
   if (!breakdown || !Object.keys(breakdown).length) {
     return null;
@@ -17,9 +19,27 @@ export default function QualityDetails({ breakdown }) {
       <div className="quality-details-header">
         <div>
           <h3>Quality Breakdown</h3>
-          <p className="muted">Deterministic OpenCV checks used to explain the score.</p>
         </div>
-        <strong>{breakdown.quality_score ?? "-"} / 100</strong>
+        <div className="quality-score-inline">
+          <strong>{breakdown.quality_score ?? "-"} / 100</strong>
+          <button className="quality-info" type="button" aria-label="Why not 100">
+            <Info size={17} />
+            <span className="quality-popover">
+              <b>Why Not 100?</b>
+              {breakdown.deductions?.length ? (
+                breakdown.deductions.map((item) => (
+                  <em key={`${item.metric}-${item.reason}`}>
+                    -{item.points} {item.metric}
+                    <small>{item.reason}</small>
+                    <small>{item.suggestion}</small>
+                  </em>
+                ))
+              ) : (
+                <em>No quality deductions found.</em>
+              )}
+            </span>
+          </button>
+        </div>
       </div>
 
       <div className="quality-metrics">
@@ -32,29 +52,6 @@ export default function QualityDetails({ breakdown }) {
         ))}
       </div>
 
-      <div className="deduction-panel">
-        <h3>Why Not 100?</h3>
-        {breakdown.deductions?.length ? (
-          <div className="deduction-list">
-            {breakdown.deductions.map((item) => (
-              <div className="deduction-item" key={`${item.metric}-${item.reason}`}>
-                <strong>-{item.points} {item.metric}</strong>
-                <p>{item.reason}</p>
-                <span>{item.suggestion}</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="muted">No points were deducted by the quality analyzer.</p>
-        )}
-      </div>
-
-      <details className="guidance">
-        <summary>Metric thresholds</summary>
-        {Object.entries(breakdown.metric_guidance || {}).map(([key, text]) => (
-          <p key={key}><strong>{formatKey(key)}:</strong> {text}</p>
-        ))}
-      </details>
     </section>
   );
 }
@@ -80,8 +77,4 @@ function rangeLabel(input, low, high) {
   if (input < low) return "Too low";
   if (input > high) return "Too high";
   return "Good";
-}
-
-function formatKey(key) {
-  return key.replaceAll("_", " ");
 }
