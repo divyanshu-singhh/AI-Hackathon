@@ -1,0 +1,197 @@
+"""FastAPI entrypoint for the AI Product Image Quality, Tagging & Rebuilder backend."""
+
+from pathlib import Path
+from typing import Annotated
+import uuid
+
+import pandas as pd
+import requests
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+
+from agents.orchestrator_agent import process_image
+from config import DEFAULT_STAGES, MAX_BATCH_SIZE, REPORT_DIR, STORAGE_DIR
+from services.batch_processor import build_batch_response
+from services.image_processor import download_image, save_upload_file
+from services.report_exporter import create_csv_report, report_path
+
+app = FastAPI(title="AI Product Image Quality, Tagging & Rebuilder")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.mount("/storage", StaticFiles(directory=STORAGE_DIR), name="storage")
+
+
+class SheetUrlRequest(BaseModel):
+    csv_url: str
+    stages: list[str] | None = None
+
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {"status": "ok", "service": "ai-image-parser-agent"}
+
+
+@app.post("/api/process-image")
+async def process_single_image(
+    image: Annotated[UploadFile, File()],
+    stages: Annotated[str | None, Form()] = None,
+) -> dict:
+    try:
+        temp_path = await save_upload_file(image)
+        return process_image(temp_path, image.filename or temp_path.name, stages=parse_stages(stages))
+    except Exception as exc:
+        return {"status": "failed", "error": f"Unable to process image: {exc}"}
+
+
+@app.post("/api/process-images")
+async def process_multiple_images(
+    images: Annotated[list[UploadFile], File()],
+    stages: Annotated[str | None, Form()] = None,
+) -> dict:
+    if len(images) > MAX_BATCH_SIZE:
+        raise HTTPException(status_code=400, detail=f"Maximum batch size is {MAX_BATCH_SIZE}")
+    paths = []
+    for image in images:
+        try:
+            paths.append((await save_upload_file(image), image.filename or "upload.jpg", None))
+        except Exception as exc:
+            failed_path = Path(f"failed_{uuid.uuid4()}.jpg")
+            paths.append((failed_path, image.filename or "upload.jpg", f"Upload failed: {exc}"))
+    valid_paths = [(path, name, category) for path, name, category in paths if path.exists()]
+    response = build_batch_response(valid_paths, parse_stages(stages))
+    upload_failures = [
+        {
+            "image_id": str(uuid.uuid4()),
+            "file_name": name,
+            "status": "failed",
+            "selected_stages": sorted(parse_stages(stages)),
+            "error": category,
+            "issues": [category] if category else [],
+            "suggestions": [],
+            "detected_objects": [],
+            "tags": [],
+        }
+        for path, name, category in paths
+        if not path.exists()
+    ]
+    if upload_failures:
+        response["results"].extend(upload_failures)
+        response["total"] += len(upload_failures)
+        response["failed"] += len(upload_failures)
+        report_name, report_url = create_csv_report(response["batch_id"], response["results"])
+        response["report_name"] = report_name
+        response["report_url"] = report_url
+    return response
+
+
+@app.post("/api/process-csv")
+async def process_csv(
+    csv_file: Annotated[UploadFile, File()],
+    stages: Annotated[str | None, Form()] = None,
+) -> dict:
+    try:
+        temp_csv = await save_raw_upload(csv_file, ".csv")
+        rows = pd.read_csv(temp_csv).fillna("").to_dict(orient="records")
+        return process_csv_rows(rows, parse_stages(stages))
+    except Exception as exc:
+        return {"status": "failed", "error": f"Unable to process CSV: {exc}"}
+
+
+@app.post("/api/process-sheet-url")
+def process_sheet_url(payload: SheetUrlRequest) -> dict:
+    try:
+        response = requests.get(payload.csv_url, timeout=45)
+        response.raise_for_status()
+        temp_csv = REPORT_DIR / f"sheet_{uuid.uuid4()}.csv"
+        temp_csv.write_bytes(response.content)
+        rows = pd.read_csv(temp_csv).fillna("").to_dict(orient="records")
+        return process_csv_rows(rows, set(payload.stages or DEFAULT_STAGES))
+    except Exception as exc:
+        return {"status": "failed", "error": f"Unable to process sheet URL: {exc}"}
+
+
+@app.get("/api/reports/{report_name}")
+def download_report(report_name: str) -> FileResponse:
+    path = report_path(report_name)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Report not found")
+    return FileResponse(path, media_type="text/csv", filename=path.name)
+
+
+def parse_stages(raw: str | None) -> set[str]:
+    if not raw:
+        return set(DEFAULT_STAGES)
+    requested = {item.strip() for item in raw.split(",") if item.strip()}
+    allowed = set(DEFAULT_STAGES)
+    selected = requested & allowed
+    return selected or set(DEFAULT_STAGES)
+
+
+async def save_raw_upload(upload: UploadFile, expected_suffix: str) -> Path:
+    suffix = Path(upload.filename or "").suffix.lower()
+    if suffix != expected_suffix:
+        raise ValueError(f"Expected a {expected_suffix} file")
+    output_path = REPORT_DIR / f"upload_{uuid.uuid4()}{expected_suffix}"
+    output_path.write_bytes(await upload.read())
+    return output_path
+
+
+def process_csv_rows(rows: list[dict], stages: set[str]) -> dict:
+    if len(rows) > MAX_BATCH_SIZE:
+        raise ValueError(f"Maximum batch size is {MAX_BATCH_SIZE}")
+
+    paths = []
+    failed_results = []
+    for row in rows:
+        image_url = str(row.get("image_url", "")).strip()
+        image_name = str(row.get("image_name", "")).strip() or Path(image_url).name or "downloaded_image.jpg"
+        expected_category = str(row.get("expected_category", "")).strip() or None
+        if not image_url:
+            failed_results.append(_failed_csv_result(image_name, "Missing image_url", stages))
+            continue
+        try:
+            paths.append((download_image(image_url, image_name), image_name, expected_category))
+        except Exception as exc:
+            failed_results.append(_failed_csv_result(image_name, f"Download failed: {exc}", stages))
+
+    response = build_batch_response(paths, stages) if paths else {
+        "batch_id": str(uuid.uuid4()),
+        "total": 0,
+        "success": 0,
+        "failed": 0,
+        "results": [],
+        "report_name": None,
+        "report_url": None,
+    }
+    if failed_results:
+        response["results"].extend(failed_results)
+        response["total"] += len(failed_results)
+        response["failed"] += len(failed_results)
+    report_name, report_url = create_csv_report(response["batch_id"], response["results"])
+    response["report_name"] = report_name
+    response["report_url"] = report_url
+    return response
+
+
+def _failed_csv_result(file_name: str, error: str, stages: set[str]) -> dict:
+    return {
+        "image_id": str(uuid.uuid4()),
+        "file_name": file_name,
+        "status": "failed",
+        "selected_stages": sorted(stages),
+        "error": error,
+        "issues": [error],
+        "suggestions": [],
+        "detected_objects": [],
+        "tags": [],
+    }
