@@ -37,6 +37,26 @@ Rules:
 - confidence should be from 0 to 1.
 """
 
+OCR_PROMPT = """You are an OCR specialist for product/catalog images.
+
+Read only visible text from the uploaded image.
+
+Return ONLY valid JSON in this exact structure:
+
+{
+  "extracted_text": "",
+  "text_blocks": [],
+  "confidence": 0.0
+}
+
+Rules:
+- Do not include markdown.
+- Do not include explanation outside JSON.
+- Preserve product labels, model numbers, sizes, units, and brand text if visible.
+- If no text is visible, return extracted_text as an empty string and text_blocks as [].
+- Do not guess text that is not visible.
+"""
+
 
 def analyze_image(image_path: str | Path) -> dict[str, Any]:
     data_url = image_to_data_url(image_path)
@@ -56,6 +76,31 @@ def analyze_image(image_path: str | Path) -> dict[str, Any]:
         raise RuntimeError(f"Vision model returned invalid JSON: {result.get('parse_error')}")
     normalized = _normalize_vision_result(result)
     normalized["_llm_meta"] = llm_meta
+    return normalized
+
+
+def extract_ocr_text(image_path: str | Path) -> dict[str, Any]:
+    data_url = image_to_data_url(image_path)
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": OCR_PROMPT},
+                {"type": "image_url", "image_url": {"url": data_url}},
+            ],
+        }
+    ]
+    result = chat_completion(VISION_MODEL, messages, temperature=0.0, max_tokens=800)
+    llm_meta = result.pop("_llm_meta", {})
+    result.pop("_raw_gateway_response", None)
+    if result.get("parse_error"):
+        raise RuntimeError(f"OCR model returned invalid JSON: {result.get('parse_error')}")
+    normalized = {
+        "extracted_text": result.get("extracted_text", "") or "",
+        "text_blocks": _as_list(result.get("text_blocks", [])),
+        "confidence": float(result.get("confidence", 0) or 0),
+        "_llm_meta": llm_meta,
+    }
     return normalized
 
 

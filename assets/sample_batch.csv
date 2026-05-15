@@ -1,3 +1,3 @@
 image_name,image_url,expected_category,notes
-sample_chair,https://example.com/chair.jpg,Furniture,Demo row only - replace URL
-sample_pump,https://example.com/pump.jpg,Industrial Pump,Demo row only - replace URL
+sample_jpeg,https://httpbin.org/image/jpeg,Sample Image,Reachable URL test row - replace for demo
+sample_placeholder,https://placehold.co/600x400.jpg?text=TMT+Bars,Steel Bars,Reachable URL test row - replace for demo

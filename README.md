@@ -9,6 +9,8 @@ It has:
 - Features: image upload, quality score, background removal, rebuilt image, optional LLM-based vision/metadata, CSV batch report
 - Live processing timeline showing current stage, percentage, model/tool name, model type, LLM token usage, and gateway cost when available
 - Output crop sizes: `125x125`, `250x250`, and `500x500`
+- Optional OCR text detection stage
+- Product name suggestions based on image analysis and visible text
 
 ## 1. Open PowerShell
 
@@ -41,7 +43,7 @@ Activate it:
 Install Python packages:
 
 ```powershell
-python -m pip install -r backend\requirements.txt
+python -m pip install -r requirements.txt
 ```
 
 Create backend environment file:
@@ -142,6 +144,7 @@ http://localhost:5173
    - Quality
    - Remove BG
    - Rebuild
+   Add `OCR Text`, `Vision`, and `Metadata` when the LLM key is configured.
 4. Select output crop size: `125x125`, `250x250`, or `500x500`.
 5. Select one product image.
 6. Click `Process Image`.
@@ -150,7 +153,36 @@ http://localhost:5173
 
 Use `Vision` and `Metadata` stages only after `IM_LLM_API_KEY` is set in `backend\.env`.
 
-## 6. LLM Debug Logs
+## 6. CSV Image URL Input
+
+CSV upload can fetch images from public URLs, then process them like uploaded files.
+
+Recommended CSV columns:
+
+```csv
+image_name,image_url,expected_category,notes
+tmt_bars,https://example.com/tmt-bars.jpg,Steel Bars,Demo image
+```
+
+Accepted image URL column names:
+
+- `image_url`
+- `Image URL`
+- `imageUrl`
+- `url`
+- `photo_url`
+- `product_image`
+
+Google Sheet image formulas are also supported:
+
+```csv
+image_name,image_url
+tmt_bars,"=IMAGE(""https://example.com/tmt-bars.jpg"")"
+```
+
+The URL must be reachable by the backend machine. If a site blocks downloads, the row will fail with a readable error in the batch report.
+
+## 7. LLM Debug Logs
 
 The project uses this endpoint:
 
@@ -181,7 +213,7 @@ Restart backend after changing `.env`.
 
 The logs will show status code, model group, usage, response preview, and JSON parse errors. They do not print the API key or image base64.
 
-## 7. Common Problems
+## 8. Common Problems
 
 ### PowerShell blocks activation
 
@@ -232,10 +264,10 @@ Just activate it:
 Then install packages:
 
 ```powershell
-python -m pip install -r backend\requirements.txt
+python -m pip install -r requirements.txt
 ```
 
-## 8. Useful Test Commands
+## 9. Useful Test Commands
 
 Run backend test:
 
@@ -252,7 +284,7 @@ cd C:\Users\IndiaMart\Desktop\AI-Hackathon\ai-image-parser-agent\frontend
 npm run build
 ```
 
-## 9. Important Files
+## 10. Important Files
 
 - Backend main file: `backend\main.py`
 - Backend environment file: `backend\.env`
@@ -261,7 +293,7 @@ npm run build
 - Image pipeline: `backend\agents\orchestrator_agent.py`
 - Sample CSV: `assets\sample_batch.csv`
 
-## 10. Stop The App
+## 11. Stop The App
 
 To stop backend or frontend, go to each PowerShell window and press:
 

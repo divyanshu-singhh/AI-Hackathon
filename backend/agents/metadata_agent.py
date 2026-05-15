@@ -19,6 +19,7 @@ Return ONLY valid JSON in this exact structure:
 
 {
   "seo_title": "",
+  "product_name_suggestions": [],
   "category": "",
   "tags": [],
   "search_keywords": [],
@@ -31,6 +32,8 @@ Return ONLY valid JSON in this exact structure:
 Rules:
 - Do not invent unavailable brand names.
 - Keep SEO title short, useful, and searchable.
+- Generate 3 practical product_name_suggestions only from the product identified in vision_analysis and visible text.
+- Do not use input filename or generic placeholders for product_name_suggestions.
 - Tags should be lowercase and practical.
 - Suggestions should be actionable.
 - catalog_readiness_score should be 0 to 100.
@@ -74,7 +77,7 @@ def fallback_metadata(
     expected_category: str | None,
     error: str,
 ) -> dict[str, Any]:
-    main_product = vision.get("main_product") or "Product image"
+    main_product = vision.get("main_product") or ""
     category = expected_category or vision.get("probable_category") or "Uncategorized"
     tags = sorted(
         {
@@ -88,6 +91,7 @@ def fallback_metadata(
     suggestions = quality_summary.get("suggestions", []) or ["Review generated tags before catalog publishing."]
     return {
         "seo_title": main_product[:80],
+        "product_name_suggestions": [],
         "category": category,
         "tags": tags,
         "search_keywords": tags,
@@ -102,6 +106,7 @@ def fallback_metadata(
 def _normalize_metadata(result: dict[str, Any]) -> dict[str, Any]:
     return {
         "seo_title": result.get("seo_title", "") or "",
+        "product_name_suggestions": _as_list(result.get("product_name_suggestions", [])),
         "category": result.get("category", "") or "Uncategorized",
         "tags": _as_list(result.get("tags", [])),
         "search_keywords": _as_list(result.get("search_keywords", [])),

@@ -34,7 +34,7 @@ REPORT_DIR = STORAGE_DIR / "reports"
 TEMP_DIR = STORAGE_DIR / "temp"
 
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
-DEFAULT_STAGES = {"quality", "background", "vision", "metadata", "rebuild"}
+DEFAULT_STAGES = {"quality", "background", "vision", "metadata", "rebuild", "ocr"}
 
 
 def ensure_storage_dirs() -> None:

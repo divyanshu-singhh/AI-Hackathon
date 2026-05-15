@@ -30,6 +30,17 @@ export default function BatchPreviewGrid({ results = [] }) {
               </div>
             </div>
             <ImageCompare result={result} />
+            <InfoPanel
+              title="Product name suggestions"
+              items={result.product_name_suggestions}
+              empty={result.selected_stages?.includes("metadata") ? "No product names returned by metadata model." : "Select Metadata to generate product names."}
+            />
+            {result.extracted_text ? (
+              <div className="ocr-text">
+                <strong>OCR Text</strong>
+                <p>{result.extracted_text}</p>
+              </div>
+            ) : null}
             <div className="batch-card-meta">
               {(result.tags || []).slice(0, 5).map((tag) => <span key={tag}>{tag}</span>)}
             </div>
@@ -37,6 +48,21 @@ export default function BatchPreviewGrid({ results = [] }) {
         ))}
       </div>
     </section>
+  );
+}
+
+function InfoPanel({ title, items = [], empty }) {
+  return (
+    <div className="suggestion-panel">
+      <strong>{title}</strong>
+      {items.length ? (
+        <div>
+          {items.slice(0, 3).map((item) => <span key={item}>{item}</span>)}
+        </div>
+      ) : (
+        <p className="muted">{empty}</p>
+      )}
+    </div>
   );
 }
 

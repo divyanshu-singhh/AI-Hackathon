@@ -4,6 +4,7 @@ const STAGES = [
   ["quality", "Quality"],
   ["background", "Remove BG"],
   ["rebuild", "Rebuild"],
+  ["ocr", "OCR Text"],
   ["vision", "Vision"],
   ["metadata", "Metadata"]
 ];

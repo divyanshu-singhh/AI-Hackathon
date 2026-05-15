@@ -787,6 +787,47 @@ table {
   margin-top: 10px;
 }
 
+.suggestion-panel,
+.ocr-text {
+  border-top: 1px solid #e2e8f0;
+  margin-top: 10px;
+  padding-top: 10px;
+}
+
+.suggestion-panel > strong,
+.ocr-text strong {
+  color: #526174;
+  display: block;
+  font-size: 0.78rem;
+  margin-bottom: 7px;
+  text-transform: uppercase;
+}
+
+.suggestion-panel div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.suggestion-panel p {
+  margin-bottom: 0;
+}
+
+.suggestion-panel span {
+  background: #f3f8ef;
+  color: #2f6d28;
+  border-radius: 999px;
+  padding: 6px 9px;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.ocr-text p {
+  color: #334155;
+  margin-bottom: 0;
+  overflow-wrap: anywhere;
+}
+
 .batch-card-meta span {
   background: #eef5fb;
   color: #215179;

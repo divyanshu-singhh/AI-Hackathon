@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from config import DEFAULT_STAGES, OUTPUT_DIR, TEXT_MODEL, VISION_MODEL, storage_url
-from agents.image_analysis_agent import analyze_image, fallback_image_analysis
+from agents.image_analysis_agent import analyze_image, extract_ocr_text, fallback_image_analysis
 from agents.metadata_agent import fallback_metadata, generate_metadata
 from agents.quality_agent import summarize_quality
 from services.background_remover import remove_background
@@ -19,6 +19,7 @@ LOCAL_STAGE_META = {
     "quality": ("Quality Analysis", "OpenCV", "Open source local tool"),
     "background": ("Background Removal", "rembg U2-Net", "Open source local tool"),
     "rebuild": ("Image Rebuild", "Pillow", "Open source local tool"),
+    "ocr": ("OCR Text Detection", VISION_MODEL, model_type_for(VISION_MODEL)),
     "vision": ("Vision Analysis", VISION_MODEL, model_type_for(VISION_MODEL)),
     "metadata": ("Metadata Generation", TEXT_MODEL, model_type_for(TEXT_MODEL)),
     "finalize": ("Finalize Result", "FastAPI", "Open source local tool"),
@@ -29,9 +30,10 @@ STAGE_PERCENT = {
     "quality": (12, 28),
     "background": (28, 48),
     "rebuild": (48, 62),
-    "vision": (62, 82),
-    "metadata": (82, 94),
-    "finalize": (94, 100),
+    "ocr": (62, 74),
+    "vision": (74, 86),
+    "metadata": (86, 96),
+    "finalize": (96, 100),
 }
 
 
@@ -94,11 +96,34 @@ def process_image(
             _emit_stage(progress_job_id, "rebuild", "skipped", message="Skipped by user")
 
         vision = {}
+        ocr = {}
+        if "ocr" in selected_stages:
+            _emit_stage(progress_job_id, "ocr", "running", message="Reading visible product text")
+            llm_image_path = resize_for_llm(uploaded_path, image_id)
+            try:
+                ocr = extract_ocr_text(llm_image_path)
+                result["extracted_text"] = ocr.get("extracted_text", "")
+                result["ocr_text_blocks"] = ocr.get("text_blocks", [])
+                _emit_stage(
+                    progress_job_id,
+                    "ocr",
+                    "completed",
+                    message="OCR text detection complete",
+                    llm_meta=ocr.get("_llm_meta", {}),
+                )
+            except Exception as exc:
+                result["issues"].append("OCR text detection failed.")
+                _emit_stage(progress_job_id, "ocr", "failed", message=str(exc))
+        else:
+            _emit_stage(progress_job_id, "ocr", "skipped", message="Skipped by user")
+
         if "vision" in selected_stages:
             _emit_stage(progress_job_id, "vision", "running", message="Sending resized image to vision model")
             llm_image_path = resize_for_llm(uploaded_path, image_id)
             try:
                 vision = analyze_image(llm_image_path)
+                if result.get("extracted_text"):
+                    vision["visible_text"] = result["extracted_text"]
                 _emit_stage(
                     progress_job_id,
                     "vision",
@@ -113,6 +138,9 @@ def process_image(
         else:
             result["issues"].append("Vision stage skipped by user.")
             _emit_stage(progress_job_id, "vision", "skipped", message="Skipped by user")
+
+        if result.get("extracted_text") and not vision.get("visible_text"):
+            vision["visible_text"] = result["extracted_text"]
 
         metadata = {}
         if "metadata" in selected_stages:
@@ -156,10 +184,12 @@ def _base_result(image_id: str, file_name: str, stages: set[str]) -> dict[str, A
         "rebuilt_image_url": None,
         "detected_objects": [],
         "extracted_text": "",
+        "ocr_text_blocks": [],
         "main_product": "",
         "category": "Uncategorized",
         "tags": [],
         "seo_title": "",
+        "product_name_suggestions": [],
         "quality_score": None,
         "quality_breakdown": {},
         "issues": [],
@@ -180,10 +210,12 @@ def _merge_result(
     result["raw_llm_analysis"] = vision
     result["main_product"] = vision.get("main_product", "")
     result["detected_objects"] = vision.get("detected_objects", [])
-    result["extracted_text"] = vision.get("visible_text", "")
+    existing_text = result.get("extracted_text", "")
+    result["extracted_text"] = vision.get("visible_text", "") or existing_text
     result["category"] = metadata.get("category") or vision.get("probable_category") or "Uncategorized"
     result["tags"] = metadata.get("tags", [])
     result["seo_title"] = metadata.get("seo_title", "")
+    result["product_name_suggestions"] = metadata.get("product_name_suggestions", [])
 
     issues = [
         *result.get("issues", []),
@@ -205,7 +237,6 @@ def _dedupe(items: list[Any]) -> list[str]:
             seen.add(text)
             output.append(text)
     return output
-
 
 def _emit_stage(
     job_id: str | None,

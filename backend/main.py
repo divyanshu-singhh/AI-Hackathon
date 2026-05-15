@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from agents.orchestrator_agent import process_image
 from config import DEFAULT_STAGES, MAX_BATCH_SIZE, REPORT_DIR, STORAGE_DIR, safe_runtime_config
 from services.batch_processor import build_batch_response
-from services.image_processor import download_image, save_upload_file
+from services.image_processor import download_image, normalize_image_url, save_upload_file
 from services.progress_manager import progress_manager
 from services.report_exporter import create_csv_report, report_path
 
@@ -192,9 +192,10 @@ def process_csv_rows(rows: list[dict], stages: set[str], job_id: str | None = No
     paths = []
     failed_results = []
     for row in rows:
-        image_url = str(row.get("image_url", "")).strip()
-        image_name = str(row.get("image_name", "")).strip() or Path(image_url).name or "downloaded_image.jpg"
-        expected_category = str(row.get("expected_category", "")).strip() or None
+        image_url = _row_value(row, "image_url", "image url", "imageurl", "url", "image", "photo_url", "photo url", "product_image", "product image", allow_url_fallback=True)
+        image_url = normalize_image_url(image_url)
+        image_name = _row_value(row, "image_name", "image name", "filename", "file_name", "name") or Path(image_url).name or "downloaded_image.jpg"
+        expected_category = _row_value(row, "expected_category", "expected category", "category") or None
         if not image_url:
             failed_results.append(_failed_csv_result(image_name, "Missing image_url", stages))
             continue
@@ -234,3 +235,20 @@ def _failed_csv_result(file_name: str, error: str, stages: set[str]) -> dict:
         "detected_objects": [],
         "tags": [],
     }
+
+
+def _row_value(row: dict, *keys: str, allow_url_fallback: bool = False) -> str:
+    """Read CSV values with common spelling/case variants."""
+    normalized = {str(key).strip().lower(): value for key, value in row.items()}
+    for key in keys:
+        value = normalized.get(key.strip().lower())
+        if value is not None and str(value).strip():
+            return str(value).strip()
+
+    # Last resort: accept any cell containing an http/image data URL.
+    if allow_url_fallback:
+        for value in row.values():
+            text = str(value or "").strip()
+            if "http://" in text or "https://" in text or text.startswith("data:image/"):
+                return text
+    return ""
