@@ -2,20 +2,22 @@
 
 from pathlib import Path
 from typing import Annotated
+import asyncio
 import uuid
 
 import pandas as pd
 import requests
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from agents.orchestrator_agent import process_image
-from config import DEFAULT_STAGES, MAX_BATCH_SIZE, REPORT_DIR, STORAGE_DIR
+from config import DEFAULT_STAGES, MAX_BATCH_SIZE, REPORT_DIR, STORAGE_DIR, safe_runtime_config
 from services.batch_processor import build_batch_response
 from services.image_processor import download_image, save_upload_file
+from services.progress_manager import progress_manager
 from services.report_exporter import create_csv_report, report_path
 
 app = FastAPI(title="AI Product Image Quality, Tagging & Rebuilder")
@@ -34,6 +36,7 @@ app.mount("/storage", StaticFiles(directory=STORAGE_DIR), name="storage")
 class SheetUrlRequest(BaseModel):
     csv_url: str
     stages: list[str] | None = None
+    job_id: str | None = None
 
 
 @app.get("/health")
@@ -41,14 +44,39 @@ def health() -> dict[str, str]:
     return {"status": "ok", "service": "ai-image-parser-agent"}
 
 
+@app.get("/api/debug/config")
+def debug_config() -> dict:
+    """Safe setup diagnostics. Does not return secret values."""
+    return safe_runtime_config()
+
+
+@app.websocket("/ws/progress/{job_id}")
+async def progress_websocket(websocket: WebSocket, job_id: str) -> None:
+    await websocket.accept()
+    queue = await progress_manager.subscribe(job_id)
+    try:
+        while True:
+            event = await queue.get()
+            await websocket.send_json(event)
+    except WebSocketDisconnect:
+        await progress_manager.unsubscribe(job_id, queue)
+
+
 @app.post("/api/process-image")
 async def process_single_image(
     image: Annotated[UploadFile, File()],
     stages: Annotated[str | None, Form()] = None,
+    job_id: Annotated[str | None, Form()] = None,
 ) -> dict:
     try:
         temp_path = await save_upload_file(image)
-        return process_image(temp_path, image.filename or temp_path.name, stages=parse_stages(stages))
+        return await asyncio.to_thread(
+            process_image,
+            temp_path,
+            image.filename or temp_path.name,
+            stages=parse_stages(stages),
+            progress_job_id=job_id,
+        )
     except Exception as exc:
         return {"status": "failed", "error": f"Unable to process image: {exc}"}
 
@@ -57,6 +85,7 @@ async def process_single_image(
 async def process_multiple_images(
     images: Annotated[list[UploadFile], File()],
     stages: Annotated[str | None, Form()] = None,
+    job_id: Annotated[str | None, Form()] = None,
 ) -> dict:
     if len(images) > MAX_BATCH_SIZE:
         raise HTTPException(status_code=400, detail=f"Maximum batch size is {MAX_BATCH_SIZE}")
@@ -68,7 +97,7 @@ async def process_multiple_images(
             failed_path = Path(f"failed_{uuid.uuid4()}.jpg")
             paths.append((failed_path, image.filename or "upload.jpg", f"Upload failed: {exc}"))
     valid_paths = [(path, name, category) for path, name, category in paths if path.exists()]
-    response = build_batch_response(valid_paths, parse_stages(stages))
+    response = await asyncio.to_thread(build_batch_response, valid_paths, parse_stages(stages), job_id)
     upload_failures = [
         {
             "image_id": str(uuid.uuid4()),
@@ -98,11 +127,12 @@ async def process_multiple_images(
 async def process_csv(
     csv_file: Annotated[UploadFile, File()],
     stages: Annotated[str | None, Form()] = None,
+    job_id: Annotated[str | None, Form()] = None,
 ) -> dict:
     try:
         temp_csv = await save_raw_upload(csv_file, ".csv")
         rows = pd.read_csv(temp_csv).fillna("").to_dict(orient="records")
-        return process_csv_rows(rows, parse_stages(stages))
+        return await asyncio.to_thread(process_csv_rows, rows, parse_stages(stages), job_id)
     except Exception as exc:
         return {"status": "failed", "error": f"Unable to process CSV: {exc}"}
 
@@ -115,7 +145,7 @@ def process_sheet_url(payload: SheetUrlRequest) -> dict:
         temp_csv = REPORT_DIR / f"sheet_{uuid.uuid4()}.csv"
         temp_csv.write_bytes(response.content)
         rows = pd.read_csv(temp_csv).fillna("").to_dict(orient="records")
-        return process_csv_rows(rows, set(payload.stages or DEFAULT_STAGES))
+        return process_csv_rows(rows, set(payload.stages or DEFAULT_STAGES), payload.job_id)
     except Exception as exc:
         return {"status": "failed", "error": f"Unable to process sheet URL: {exc}"}
 
@@ -146,7 +176,7 @@ async def save_raw_upload(upload: UploadFile, expected_suffix: str) -> Path:
     return output_path
 
 
-def process_csv_rows(rows: list[dict], stages: set[str]) -> dict:
+def process_csv_rows(rows: list[dict], stages: set[str], job_id: str | None = None) -> dict:
     if len(rows) > MAX_BATCH_SIZE:
         raise ValueError(f"Maximum batch size is {MAX_BATCH_SIZE}")
 
@@ -164,7 +194,7 @@ def process_csv_rows(rows: list[dict], stages: set[str]) -> dict:
         except Exception as exc:
             failed_results.append(_failed_csv_result(image_name, f"Download failed: {exc}", stages))
 
-    response = build_batch_response(paths, stages) if paths else {
+    response = build_batch_response(paths, stages, job_id) if paths else {
         "batch_id": str(uuid.uuid4()),
         "total": 0,
         "success": 0,

@@ -50,8 +50,13 @@ def analyze_image(image_path: str | Path) -> dict[str, Any]:
         }
     ]
     result = chat_completion(VISION_MODEL, messages, temperature=0.1, max_tokens=1200)
+    llm_meta = result.pop("_llm_meta", {})
     result.pop("_raw_gateway_response", None)
-    return _normalize_vision_result(result)
+    if result.get("parse_error"):
+        raise RuntimeError(f"Vision model returned invalid JSON: {result.get('parse_error')}")
+    normalized = _normalize_vision_result(result)
+    normalized["_llm_meta"] = llm_meta
+    return normalized
 
 
 def fallback_image_analysis(file_name: str, error: str) -> dict[str, Any]:

@@ -7,6 +7,7 @@ It has:
 - Backend: Python FastAPI
 - Frontend: React + Vite
 - Features: image upload, quality score, background removal, rebuilt image, optional LLM-based vision/metadata, CSV batch report
+- Live processing timeline showing current stage, percentage, model/tool name, model type, LLM token usage, and gateway cost when available
 
 ## 1. Open PowerShell
 
@@ -58,6 +59,10 @@ Set your LLM key:
 
 ```env
 IM_LLM_API_KEY=your_actual_access_key
+VISION_MODEL=openai/gpt-4o
+TEXT_MODEL=openai/gpt-4.1
+FALLBACK_TEXT_MODEL=qwen/qwen3-32b
+LLM_DEBUG=false
 ```
 
 Save and close Notepad.
@@ -83,6 +88,20 @@ Expected result:
 ```json
 {"status":"ok","service":"ai-image-parser-agent"}
 ```
+
+Check whether the backend can see your LLM key:
+
+```text
+http://localhost:8000/api/debug/config
+```
+
+Look for:
+
+```json
+"api_key_configured": true
+```
+
+If it is `false`, create or fix `backend\.env`, then restart backend.
 
 ## 4. Frontend Setup
 
@@ -124,11 +143,43 @@ http://localhost:5173
    - Rebuild
 4. Select one product image.
 5. Click `Process Image`.
-6. Review original image, rebuilt image, quality score, issues, and suggestions.
+6. Watch the `Processing Timeline` table for current stage, percentage, model/tool used, and LLM token usage.
+7. Review original image, rebuilt image, quality score, issues, and suggestions.
 
 Use `Vision` and `Metadata` stages only after `IM_LLM_API_KEY` is set in `backend\.env`.
 
-## 6. Common Problems
+## 6. LLM Debug Logs
+
+The project uses this endpoint:
+
+```text
+POST https://imllm.intermesh.net/v1/chat/completions
+```
+
+The backend reads the model output from:
+
+```text
+choices[0].message.content
+```
+
+If an LLM model fails or returns unexpected JSON, enable debug logs:
+
+```powershell
+cd C:\Users\IndiaMart\Desktop\AI-Hackathon\ai-image-parser-agent\backend
+notepad .env
+```
+
+Change:
+
+```env
+LLM_DEBUG=true
+```
+
+Restart backend after changing `.env`.
+
+The logs will show status code, model group, usage, response preview, and JSON parse errors. They do not print the API key or image base64.
+
+## 7. Common Problems
 
 ### PowerShell blocks activation
 
@@ -182,7 +233,7 @@ Then install packages:
 python -m pip install -r requirements.txt
 ```
 
-## 7. Useful Test Commands
+## 8. Useful Test Commands
 
 Run backend test:
 
@@ -199,7 +250,7 @@ cd C:\Users\IndiaMart\Desktop\AI-Hackathon\ai-image-parser-agent\frontend
 npm run build
 ```
 
-## 8. Important Files
+## 9. Important Files
 
 - Backend main file: `backend\main.py`
 - Backend environment file: `backend\.env`
@@ -208,7 +259,7 @@ npm run build
 - Image pipeline: `backend\agents\orchestrator_agent.py`
 - Sample CSV: `assets\sample_batch.csv`
 
-## 9. Stop The App
+## 10. Stop The App
 
 To stop backend or frontend, go to each PowerShell window and press:
 

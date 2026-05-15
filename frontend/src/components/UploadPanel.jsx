@@ -1,9 +1,9 @@
 import { ImageUp, Play } from "lucide-react";
 import { useMemo, useState } from "react";
-import { processSingleImage } from "../api/client.js";
+import { createJobId, processSingleImage, subscribeToProgress } from "../api/client.js";
 import Loader from "./Loader.jsx";
 
-export default function UploadPanel({ stages, onResult }) {
+export default function UploadPanel({ stages, onResult, onProgressReset, onProgressEvent, onProgressState }) {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -13,12 +13,16 @@ export default function UploadPanel({ stages, onResult }) {
     if (!file) return;
     setLoading(true);
     setError("");
+    const jobId = createJobId();
+    onProgressReset?.(jobId);
+    const closeProgress = subscribeToProgress(jobId, onProgressEvent, onProgressState);
     try {
-      onResult(await processSingleImage(file, stages));
+      onResult(await processSingleImage(file, stages, jobId));
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
+      setTimeout(closeProgress, 1200);
     }
   }
 

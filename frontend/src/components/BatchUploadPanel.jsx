@@ -1,9 +1,9 @@
 import { Images, Play } from "lucide-react";
 import { useState } from "react";
-import { processMultipleImages } from "../api/client.js";
+import { createJobId, processMultipleImages, subscribeToProgress } from "../api/client.js";
 import Loader from "./Loader.jsx";
 
-export default function BatchUploadPanel({ stages, onBatch }) {
+export default function BatchUploadPanel({ stages, onBatch, onProgressReset, onProgressEvent, onProgressState }) {
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -12,12 +12,16 @@ export default function BatchUploadPanel({ stages, onBatch }) {
     if (!files.length) return;
     setLoading(true);
     setError("");
+    const jobId = createJobId();
+    onProgressReset?.(jobId);
+    const closeProgress = subscribeToProgress(jobId, onProgressEvent, onProgressState);
     try {
-      onBatch(await processMultipleImages(files, stages));
+      onBatch(await processMultipleImages(files, stages, jobId));
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
+      setTimeout(closeProgress, 1200);
     }
   }
 

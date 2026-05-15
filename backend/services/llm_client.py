@@ -2,6 +2,7 @@
 
 import base64
 import json
+import logging
 import mimetypes
 import re
 from pathlib import Path
@@ -9,7 +10,9 @@ from typing import Any
 
 import requests
 
-from config import IM_LLM_API_KEY, IM_LLM_BASE_URL
+from config import IM_LLM_API_KEY, IM_LLM_BASE_URL, LLM_DEBUG
+
+logger = logging.getLogger("ai_image_parser.llm")
 
 
 def image_to_data_url(path: str | Path) -> str:
@@ -65,13 +68,85 @@ def chat_completion(
         "Content-Type": "application/json",
     }
 
+    if LLM_DEBUG:
+        logger.warning(
+            "LLM request model=%s url=%s message_count=%s has_image=%s max_tokens=%s",
+            model,
+            url,
+            len(messages),
+            _messages_have_image(messages),
+            max_tokens,
+        )
+
     response = requests.post(url, headers=headers, json=payload, timeout=90)
+    if LLM_DEBUG:
+        logger.warning(
+            "LLM response status=%s call_id=%s model_group=%s cost=%s",
+            response.status_code,
+            response.headers.get("x-litellm-call-id", ""),
+            response.headers.get("x-litellm-model-group", ""),
+            response.headers.get("x-litellm-response-cost", ""),
+        )
+
     if response.status_code >= 400:
         safe_body = response.text[:1200]
+        if LLM_DEBUG:
+            logger.warning("LLM error body preview=%s", safe_body)
         raise RuntimeError(f"LLM gateway error {response.status_code}: {safe_body}")
 
     data = response.json()
-    content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+    content = _extract_message_content(data)
+    if LLM_DEBUG:
+        logger.warning(
+            "LLM response usage=%s content_preview=%s",
+            data.get("usage", {}),
+            str(content)[:600],
+        )
     parsed = safe_parse_json(content)
+    if LLM_DEBUG:
+        logger.warning("LLM parsed keys=%s parse_error=%s", list(parsed.keys()), parsed.get("parse_error", ""))
+    parsed["_llm_meta"] = _llm_meta(model, data, response)
     parsed["_raw_gateway_response"] = data
     return parsed
+
+
+def _llm_meta(model: str, data: dict[str, Any], response: requests.Response) -> dict[str, Any]:
+    usage = data.get("usage", {}) or {}
+    return {
+        "model_name": model,
+        "response_model": data.get("model", ""),
+        "model_group": response.headers.get("x-litellm-model-group", ""),
+        "call_id": response.headers.get("x-litellm-call-id", ""),
+        "prompt_tokens": int(usage.get("prompt_tokens", 0) or 0),
+        "completion_tokens": int(usage.get("completion_tokens", 0) or 0),
+        "total_tokens": int(usage.get("total_tokens", 0) or 0),
+        "estimated_cost": response.headers.get("x-litellm-response-cost", ""),
+    }
+
+
+def _extract_message_content(data: dict[str, Any]) -> str:
+    """Extract assistant text from OpenAI-compatible chat completion responses."""
+    message = data.get("choices", [{}])[0].get("message", {})
+    content = message.get("content", "")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, dict):
+                parts.append(str(item.get("text", "")))
+            else:
+                parts.append(str(item))
+        return "".join(parts)
+    return str(content or "")
+
+
+def _messages_have_image(messages: list[dict[str, Any]]) -> bool:
+    """Return whether a request contains image input without logging image data."""
+    for message in messages:
+        content = message.get("content")
+        if isinstance(content, list):
+            for item in content:
+                if isinstance(item, dict) and item.get("type") == "image_url":
+                    return True
+    return False

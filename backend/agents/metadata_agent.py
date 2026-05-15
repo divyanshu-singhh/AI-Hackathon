@@ -58,8 +58,13 @@ def generate_metadata(
         result = chat_completion(TEXT_MODEL, messages, temperature=0.2, max_tokens=900)
     except Exception:
         result = chat_completion(FALLBACK_TEXT_MODEL, messages, temperature=0.2, max_tokens=900)
+    llm_meta = result.pop("_llm_meta", {})
     result.pop("_raw_gateway_response", None)
-    return _normalize_metadata(result)
+    if result.get("parse_error"):
+        raise RuntimeError(f"Metadata model returned invalid JSON: {result.get('parse_error')}")
+    normalized = _normalize_metadata(result)
+    normalized["_llm_meta"] = llm_meta
+    return normalized
 
 
 def fallback_metadata(

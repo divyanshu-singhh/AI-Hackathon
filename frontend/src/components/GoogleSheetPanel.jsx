@@ -1,9 +1,9 @@
 import { FileSpreadsheet, Link, Play } from "lucide-react";
 import { useState } from "react";
-import { processCsv, processSheetUrl } from "../api/client.js";
+import { createJobId, processCsv, processSheetUrl, subscribeToProgress } from "../api/client.js";
 import Loader from "./Loader.jsx";
 
-export default function GoogleSheetPanel({ stages, onBatch }) {
+export default function GoogleSheetPanel({ stages, onBatch, onProgressReset, onProgressEvent, onProgressState }) {
   const [csvFile, setCsvFile] = useState(null);
   const [csvUrl, setCsvUrl] = useState("");
   const [loading, setLoading] = useState(false);
@@ -13,12 +13,16 @@ export default function GoogleSheetPanel({ stages, onBatch }) {
     if (!csvFile) return;
     setLoading(true);
     setError("");
+    const jobId = createJobId();
+    onProgressReset?.(jobId);
+    const closeProgress = subscribeToProgress(jobId, onProgressEvent, onProgressState);
     try {
-      onBatch(await processCsv(csvFile, stages));
+      onBatch(await processCsv(csvFile, stages, jobId));
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
+      setTimeout(closeProgress, 1200);
     }
   }
 
@@ -26,12 +30,16 @@ export default function GoogleSheetPanel({ stages, onBatch }) {
     if (!csvUrl.trim()) return;
     setLoading(true);
     setError("");
+    const jobId = createJobId();
+    onProgressReset?.(jobId);
+    const closeProgress = subscribeToProgress(jobId, onProgressEvent, onProgressState);
     try {
-      onBatch(await processSheetUrl(csvUrl.trim(), stages));
+      onBatch(await processSheetUrl(csvUrl.trim(), stages, jobId));
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
+      setTimeout(closeProgress, 1200);
     }
   }
 

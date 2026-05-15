@@ -1,4 +1,5 @@
 import ImageCompare from "./ImageCompare.jsx";
+import QualityDetails from "./QualityDetails.jsx";
 import QualityScore from "./QualityScore.jsx";
 
 export default function ResultCard({ result }) {
@@ -23,6 +24,8 @@ export default function ResultCard({ result }) {
       </div>
 
       <ImageCompare result={result} />
+
+      <QualityDetails breakdown={result.quality_breakdown} />
 
       <div className="metadata-grid">
         <InfoBlock title="Objects" items={result.detected_objects} empty="No objects detected" />
