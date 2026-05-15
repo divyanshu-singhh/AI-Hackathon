@@ -41,7 +41,7 @@ Activate it:
 Install Python packages:
 
 ```powershell
-python -m pip install -r requirements.txt
+python -m pip install -r backend\requirements.txt
 ```
 
 Create backend environment file:
@@ -232,7 +232,7 @@ Just activate it:
 Then install packages:
 
 ```powershell
-python -m pip install -r requirements.txt
+python -m pip install -r backend\requirements.txt
 ```
 
 ## 8. Useful Test Commands
