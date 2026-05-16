@@ -18,6 +18,8 @@ class ImageResult(BaseModel):
     seo_title: str = ""
     quality_score: int | None = None
     quality_breakdown: dict[str, Any] = Field(default_factory=dict)
+    rebuilt_quality_score: int | None = None
+    rebuilt_quality_breakdown: dict[str, Any] = Field(default_factory=dict)
     issues: list[str] = Field(default_factory=list)
     suggestions: list[str] = Field(default_factory=list)
     raw_llm_analysis: dict[str, Any] = Field(default_factory=dict)

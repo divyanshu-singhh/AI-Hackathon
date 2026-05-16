@@ -33,6 +33,7 @@ export default function ResultsTable({ batch }) {
               <th>OCR Text</th>
               <th>Product Names</th>
               <th>Quality</th>
+              <th>Rebuilt Quality</th>
               <th>Objects</th>
               <th>Tags</th>
               <th>Issues</th>
@@ -48,6 +49,7 @@ export default function ResultsTable({ batch }) {
                 <td>{row.extracted_text || ""}</td>
                 <td>{(row.product_name_suggestions || []).slice(0, 2).join(", ") || "-"}</td>
                 <td>{row.quality_score ?? "-"}</td>
+                <td>{row.rebuilt_quality_score ?? "-"}</td>
                 <td>{(row.detected_objects || []).join(", ") || "-"}</td>
                 <td>{(row.tags || []).join(", ") || "-"}</td>
                 <td>{(row.issues || []).slice(0, 2).join("; ") || "-"}</td>

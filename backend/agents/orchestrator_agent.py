@@ -12,7 +12,7 @@ from services.background_remover import remove_background
 from services.image_processor import copy_to_uploads, normalize_image, resize_for_llm, validate_image_path
 from services.image_rebuilder import rebuild_catalog_image
 from services.progress_manager import model_type_for, progress_manager
-from services.quality_analyzer import analyze_quality
+from services.quality_analyzer import analyze_quality, analyze_rebuilt_quality
 
 LOCAL_STAGE_META = {
     "validate": ("Validate & Save", "Python/Pillow", "Open source local tool"),
@@ -91,6 +91,12 @@ def process_image(
             rebuild_catalog_image(bg_removed_path, rebuilt_output, crop_size, quality)
             result["rebuilt_image_url"] = storage_url("outputs", rebuilt_output.name)
             result["crop_size"] = crop_size
+            try:
+                rebuilt_quality = analyze_rebuilt_quality(rebuilt_output)
+                result["rebuilt_quality_score"] = rebuilt_quality.get("quality_score")
+                result["rebuilt_quality_breakdown"] = rebuilt_quality
+            except Exception as exc:
+                result["issues"].append(f"Rebuilt image quality check failed: {exc}")
             _emit_stage(progress_job_id, "rebuild", "completed", message="Catalog image rebuilt")
         else:
             _emit_stage(progress_job_id, "rebuild", "skipped", message="Skipped by user")
@@ -192,6 +198,8 @@ def _base_result(image_id: str, file_name: str, stages: set[str]) -> dict[str, A
         "product_name_suggestions": [],
         "quality_score": None,
         "quality_breakdown": {},
+        "rebuilt_quality_score": None,
+        "rebuilt_quality_breakdown": {},
         "issues": [],
         "suggestions": [],
         "raw_llm_analysis": {},
