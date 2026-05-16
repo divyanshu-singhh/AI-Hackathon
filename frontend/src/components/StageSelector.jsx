@@ -1,12 +1,12 @@
 import { CheckSquare, Sparkles } from "lucide-react";
 
 const STAGES = [
-  ["quality", "Quality"],
-  ["background", "Remove BG"],
-  ["rebuild", "Rebuild"],
-  ["ocr", "OCR Text"],
-  ["vision", "Vision"],
-  ["metadata", "Metadata"]
+  ["quality", "Check Image Quality"],
+  ["background", "Remove Background"],
+  ["rebuild", "Create Final Image"],
+  ["ocr", "Read Text from Image"],
+  ["vision", "Identify Product"],
+  ["metadata", "Create Title & Tags"]
 ];
 
 export default function StageSelector({ selected, onChange }) {

@@ -34,7 +34,7 @@ export default function ResultsTable({ batch }) {
               <th>OCR Text</th>
               <th>Product Names</th>
               <th>Quality</th>
-              <th>Rebuilt Quality</th>
+              <th>Final Image Quality</th>
               <th>Cost (USD est.)</th>
               <th>Objects</th>
               <th>Tags</th>

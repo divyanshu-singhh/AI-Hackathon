@@ -17,12 +17,12 @@ from services.quality_analyzer import analyze_quality, analyze_rebuilt_quality
 
 LOCAL_STAGE_META = {
     "validate": ("Validate & Save", "Python/Pillow", "Open source local tool"),
-    "quality": ("Quality Analysis", "OpenCV", "Open source local tool"),
-    "background": ("Background Removal", "rembg U2-Net", "Open source local tool"),
-    "rebuild": ("Image Rebuild", "Pillow", "Open source local tool"),
-    "ocr": ("OCR Text Detection", VISION_MODEL, model_type_for(VISION_MODEL)),
-    "vision": ("Vision Analysis", VISION_MODEL, model_type_for(VISION_MODEL)),
-    "metadata": ("Metadata Generation", TEXT_MODEL, model_type_for(TEXT_MODEL)),
+    "quality": ("Check Image Quality", "OpenCV", "Open source local tool"),
+    "background": ("Remove Background", "rembg U2-Net", "Open source local tool"),
+    "rebuild": ("Create Final Image", "Pillow", "Open source local tool"),
+    "ocr": ("Read Text from Image", VISION_MODEL, model_type_for(VISION_MODEL)),
+    "vision": ("Identify Product", VISION_MODEL, model_type_for(VISION_MODEL)),
+    "metadata": ("Create Title & Tags", TEXT_MODEL, model_type_for(TEXT_MODEL)),
     "finalize": ("Finalize Result", "FastAPI", "Open source local tool"),
 }
 
@@ -97,7 +97,7 @@ def process_image(
                 result["rebuilt_quality_score"] = rebuilt_quality.get("quality_score")
                 result["rebuilt_quality_breakdown"] = rebuilt_quality
             except Exception as exc:
-                result["issues"].append(f"Rebuilt image quality check failed: {exc}")
+                result["issues"].append(f"Final image quality check failed: {exc}")
             _emit_stage(progress_job_id, "rebuild", "completed", message="Catalog image rebuilt")
         else:
             _emit_stage(progress_job_id, "rebuild", "skipped", message="Skipped by user")
@@ -126,7 +126,7 @@ def process_image(
             _emit_stage(progress_job_id, "ocr", "skipped", message="Skipped by user")
 
         if "vision" in selected_stages:
-            _emit_stage(progress_job_id, "vision", "running", message="Sending resized image to vision model")
+            _emit_stage(progress_job_id, "vision", "running", message="Identifying the product and visible details")
             llm_image_path = resize_for_llm(uploaded_path, image_id)
             try:
                 vision = analyze_image(llm_image_path)
@@ -137,7 +137,7 @@ def process_image(
                     progress_job_id,
                     "vision",
                     "completed",
-                    message="Vision model returned product analysis",
+                    message="Product details identified",
                     llm_meta=vision.get("_llm_meta", {}),
                 )
             except Exception as exc:
@@ -145,7 +145,7 @@ def process_image(
                 result["issues"].append("LLM analysis failed; fallback result used.")
                 _emit_stage(progress_job_id, "vision", "failed", message=str(exc))
         else:
-            result["issues"].append("Vision stage skipped by user.")
+            result["issues"].append("Identify Product stage skipped by user.")
             _emit_stage(progress_job_id, "vision", "skipped", message="Skipped by user")
 
         if result.get("extracted_text") and not vision.get("visible_text"):
@@ -153,7 +153,7 @@ def process_image(
 
         metadata = {}
         if "metadata" in selected_stages:
-            _emit_stage(progress_job_id, "metadata", "running", message="Generating catalog title, tags, and suggestions")
+            _emit_stage(progress_job_id, "metadata", "running", message="Creating product title, tags, and catalog suggestions")
             try:
                 metadata = generate_metadata(vision, quality, quality_summary, expected_category)
                 _add_llm_usage(result, metadata.get("_llm_meta", {}))
@@ -161,7 +161,7 @@ def process_image(
                     progress_job_id,
                     "metadata",
                     "completed",
-                    message="Metadata generated",
+                    message="Title and tags created",
                     llm_meta=metadata.get("_llm_meta", {}),
                 )
             except Exception as exc:
@@ -169,7 +169,7 @@ def process_image(
                 result["issues"].append("LLM metadata failed; fallback result used.")
                 _emit_stage(progress_job_id, "metadata", "failed", message=str(exc))
         else:
-            result["issues"].append("Metadata stage skipped by user.")
+            result["issues"].append("Create Title & Tags stage skipped by user.")
             _emit_stage(progress_job_id, "metadata", "skipped", message="Skipped by user")
 
         _emit_stage(progress_job_id, "finalize", "running", message="Combining image outputs and metadata")

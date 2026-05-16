@@ -33,7 +33,7 @@ export default function BatchPreviewGrid({ results = [] }) {
             <InfoPanel
               title="Product name suggestions"
               items={result.product_name_suggestions}
-              empty={result.selected_stages?.includes("metadata") ? "No product names returned by metadata model." : "Select Metadata to generate product names."}
+              empty={result.selected_stages?.includes("metadata") ? "No product names were created." : "Select Create Title & Tags to generate product names."}
             />
             {result.extracted_text ? (
               <div className="ocr-text">

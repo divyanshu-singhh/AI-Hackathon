@@ -6,7 +6,7 @@ It has:
 
 - Backend: Python FastAPI
 - Frontend: React + Vite
-- Features: image upload, quality score, background removal, rebuilt image, optional LLM-based vision/metadata, CSV batch report
+- Features: image upload, quality score, background removal, final catalog image, optional AI product identification/title generation, CSV batch report
 - Live processing timeline showing current stage, percentage, model/tool name, model type, LLM token usage, and gateway cost when available
 - Output crop sizes: `125x125`, `250x250`, and `500x500`
 - Optional OCR text detection stage
@@ -139,21 +139,39 @@ http://localhost:5173
 ## 5. How To Use The App
 
 1. Open `http://localhost:5173`.
-2. Select stages you want to run.
+2. Select processing stages you want to run.
 3. Start with these safe local stages:
-   - Quality
-   - Remove BG
-   - Rebuild
-   Add `OCR Text`, `Vision`, and `Metadata` when the LLM key is configured.
+   - Check Image Quality
+   - Remove Background
+   - Create Final Image
+   Add `Read Text from Image`, `Identify Product`, and `Create Title & Tags` when the LLM key is configured.
 4. Select output crop size: `125x125`, `250x250`, or `500x500`.
-5. Select one product image.
+5. Select one or more product images.
 6. Click `Process Image`.
 7. Watch the `Processing Timeline` table for current stage, percentage, model/tool used, and LLM token usage.
-8. Review original image, rebuilt image, quality score, issues, and suggestions.
+8. Review original image, final image, quality score, issues, and suggestions.
 
-Use `Vision` and `Metadata` stages only after `IM_LLM_API_KEY` is set in `backend\.env`.
+Use `Identify Product` and `Create Title & Tags` only after `IM_LLM_API_KEY` is set in `backend\.env`.
 
-## 6. CSV Image URL Input
+## 6. Processing Stages
+
+The app shows simple names in the UI, while the backend keeps short internal stage IDs such as `quality`, `background`, `rebuild`, `ocr`, `vision`, and `metadata`.
+
+| UI stage name | Internal ID | What it does | Tool/API used |
+|---|---|---|---|
+| Check Image Quality | `quality` | Checks blur, brightness, contrast, noise, resolution, and background complexity. Produces the quality score, issues, and suggestions. | Local OpenCV |
+| Remove Background | `background` | Removes the existing background and creates a product-focused image. | Local `rembg` / U2-Net |
+| Create Final Image | `rebuild` | Crops the product tighter, enlarges it within the selected size, places it on a clean white canvas, and applies basic corrections. | Local Pillow/OpenCV |
+| Read Text from Image | `ocr` | Reads visible text such as brand, label, model number, size, or printed product text. | Vision LLM API |
+| Identify Product | `vision` | Looks at the image and identifies the main product, visible objects, category clues, colors, material, packaging, and other visual details. | Vision LLM API |
+| Create Title & Tags | `metadata` | Converts the identified product details and quality result into catalog fields such as title, product name suggestions, category, tags, issues, and suggestions. | Text LLM API |
+
+`Identify Product` and `Create Title & Tags` work together:
+
+- `Identify Product` understands what is visible in the image.
+- `Create Title & Tags` uses that understanding to create catalog-ready text.
+
+## 7. CSV Image URL Input
 
 CSV upload can fetch images from public URLs, then process them like uploaded files.
 
@@ -182,7 +200,7 @@ tmt_bars,"=IMAGE(""https://example.com/tmt-bars.jpg"")"
 
 The URL must be reachable by the backend machine. If a site blocks downloads, the row will fail with a readable error in the batch report.
 
-## 7. LLM Debug Logs
+## 8. LLM Debug Logs
 
 The project uses this endpoint:
 
@@ -213,7 +231,7 @@ Restart backend after changing `.env`.
 
 The logs will show status code, model group, usage, response preview, and JSON parse errors. They do not print the API key or image base64.
 
-## 8. Common Problems
+## 9. Common Problems
 
 ### PowerShell blocks activation
 
@@ -267,7 +285,7 @@ Then install packages:
 python -m pip install -r requirements.txt
 ```
 
-## 9. Useful Test Commands
+## 10. Useful Test Commands
 
 Run backend test:
 
@@ -284,7 +302,7 @@ cd C:\Users\IndiaMart\Desktop\AI-Hackathon\ai-image-parser-agent\frontend
 npm run build
 ```
 
-## 10. Important Files
+## 11. Important Files
 
 - Backend main file: `backend\main.py`
 - Backend environment file: `backend\.env`
@@ -293,7 +311,7 @@ npm run build
 - Image pipeline: `backend\agents\orchestrator_agent.py`
 - Sample CSV: `assets\sample_batch.csv`
 
-## 11. Stop The App
+## 12. Stop The App
 
 To stop backend or frontend, go to each PowerShell window and press:
 
