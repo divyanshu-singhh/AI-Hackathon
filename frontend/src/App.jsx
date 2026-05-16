@@ -1,6 +1,5 @@
 import { useState } from "react";
 import Header from "./components/Header.jsx";
-import UploadPanel from "./components/UploadPanel.jsx";
 import BatchUploadPanel from "./components/BatchUploadPanel.jsx";
 import GoogleSheetPanel from "./components/GoogleSheetPanel.jsx";
 import ResultsTable from "./components/ResultsTable.jsx";
@@ -8,12 +7,13 @@ import StageSelector from "./components/StageSelector.jsx";
 import ProgressTimeline from "./components/ProgressTimeline.jsx";
 import CropSelector from "./components/CropSelector.jsx";
 import BatchPreviewGrid from "./components/BatchPreviewGrid.jsx";
+import Loader from "./components/Loader.jsx";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 const DEFAULT_STAGES = new Set(["quality", "background", "rebuild"]);
 
 export default function App() {
-  const [tab, setTab] = useState("single");
+  const [tab, setTab] = useState("image");
   const [stages, setStages] = useState(DEFAULT_STAGES);
   const [batchResult, setBatchResult] = useState(null);
   const [progressEvents, setProgressEvents] = useState([]);
@@ -23,19 +23,6 @@ export default function App() {
 
   function handleBatch(result) {
     setBatchResult(result);
-    setControlsCollapsed(true);
-  }
-
-  function handleSingle(result) {
-    setBatchResult({
-      batch_id: result.image_id,
-      total: 1,
-      success: result.status === "success" ? 1 : 0,
-      failed: result.status === "success" ? 0 : 1,
-      report_name: result.report_name,
-      report_url: result.report_url,
-      results: [result]
-    });
     setControlsCollapsed(true);
   }
 
@@ -60,16 +47,12 @@ export default function App() {
           {controlsCollapsed ? null : (
             <>
           <nav className="tabs" aria-label="Upload modes">
-            <button className={tab === "single" ? "active" : ""} onClick={() => setTab("single")}>Single</button>
-            <button className={tab === "multi" ? "active" : ""} onClick={() => setTab("multi")}>Multi</button>
+            <button className={tab === "image" ? "active" : ""} onClick={() => setTab("image")}>Image</button>
             <button className={tab === "csv" ? "active" : ""} onClick={() => setTab("csv")}>CSV</button>
           </nav>
           <StageSelector selected={stages} onChange={setStages} />
           <CropSelector value={cropSize} onChange={setCropSize} />
-          {tab === "single" ? (
-            <UploadPanel stages={stages} cropSize={cropSize} onResult={handleSingle} onProgressReset={resetProgress} onProgressEvent={addProgressEvent} onProgressState={setProgressState} />
-          ) : null}
-          {tab === "multi" ? (
+          {tab === "image" ? (
             <BatchUploadPanel stages={stages} cropSize={cropSize} onBatch={handleBatch} onProgressReset={resetProgress} onProgressEvent={addProgressEvent} onProgressState={setProgressState} />
           ) : null}
           {tab === "csv" ? (
@@ -80,6 +63,9 @@ export default function App() {
         </aside>
         <section className="result-column">
           <ProgressTimeline events={progressEvents} connectionState={progressState} />
+          {batchResult?.total_estimated_cost_display ? (
+            <Loader label="Final LLM cost" cost={batchResult.total_estimated_cost_display} done />
+          ) : null}
           <BatchPreviewGrid results={batchResult?.results || []} />
           <ResultsTable batch={batchResult} />
         </section>

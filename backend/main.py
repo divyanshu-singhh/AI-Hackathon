@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from agents.orchestrator_agent import process_image
 from config import DEFAULT_STAGES, MAX_BATCH_SIZE, REPORT_DIR, STORAGE_DIR, safe_runtime_config
 from services.batch_processor import build_batch_response
+from services.cost_utils import format_cost, total_result_cost
 from services.image_processor import download_image, normalize_image_url, save_upload_file
 from services.progress_manager import progress_manager
 from services.report_exporter import create_csv_report, report_path
@@ -83,6 +84,8 @@ async def process_single_image(
         report_name, report_url = create_csv_report(result["image_id"], [result])
         result["report_name"] = report_name
         result["report_url"] = report_url
+        result["total_estimated_cost"] = total_result_cost([result])
+        result["total_estimated_cost_display"] = format_cost(result["total_estimated_cost"])
         return result
     except Exception as exc:
         return {"status": "failed", "error": f"Unable to process image: {exc}"}
@@ -125,6 +128,8 @@ async def process_multiple_images(
         response["results"].extend(upload_failures)
         response["total"] += len(upload_failures)
         response["failed"] += len(upload_failures)
+        response["total_estimated_cost"] = total_result_cost(response["results"])
+        response["total_estimated_cost_display"] = format_cost(response["total_estimated_cost"])
         report_name, report_url = create_csv_report(response["batch_id"], response["results"])
         response["report_name"] = report_name
         response["report_url"] = report_url
@@ -214,6 +219,8 @@ def process_csv_rows(rows: list[dict], stages: set[str], job_id: str | None = No
         "success": 0,
         "failed": 0,
         "results": [],
+        "total_estimated_cost": 0.0,
+        "total_estimated_cost_display": "",
         "report_name": None,
         "report_url": None,
     }
@@ -221,6 +228,8 @@ def process_csv_rows(rows: list[dict], stages: set[str], job_id: str | None = No
         response["results"].extend(failed_results)
         response["total"] += len(failed_results)
         response["failed"] += len(failed_results)
+    response["total_estimated_cost"] = total_result_cost(response["results"])
+    response["total_estimated_cost_display"] = format_cost(response["total_estimated_cost"])
     report_name, report_url = create_csv_report(response["batch_id"], response["results"])
     response["report_name"] = report_name
     response["report_url"] = report_url
@@ -238,6 +247,9 @@ def _failed_csv_result(file_name: str, error: str, stages: set[str]) -> dict:
         "suggestions": [],
         "detected_objects": [],
         "tags": [],
+        "llm_cost": 0.0,
+        "llm_cost_display": "",
+        "llm_calls": [],
     }
 
 

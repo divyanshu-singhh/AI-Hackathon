@@ -14,6 +14,7 @@ export default function ResultsTable({ batch }) {
           <h2>Batch Results</h2>
           <p className="muted">
             {batch.success || 0} success / {batch.failed || 0} failed / {batch.total || results.length} total
+            {batch.total_estimated_cost_display ? ` / final cost ${batch.total_estimated_cost_display}` : ""}
           </p>
         </div>
         {batch.report_name ? (
@@ -34,6 +35,7 @@ export default function ResultsTable({ batch }) {
               <th>Product Names</th>
               <th>Quality</th>
               <th>Rebuilt Quality</th>
+              <th>Cost (USD est.)</th>
               <th>Objects</th>
               <th>Tags</th>
               <th>Issues</th>
@@ -50,6 +52,7 @@ export default function ResultsTable({ batch }) {
                 <td>{(row.product_name_suggestions || []).slice(0, 2).join(", ") || "-"}</td>
                 <td>{row.quality_score ?? "-"}</td>
                 <td>{row.rebuilt_quality_score ?? "-"}</td>
+                <td>{row.llm_cost_display || "-"}</td>
                 <td>{(row.detected_objects || []).join(", ") || "-"}</td>
                 <td>{(row.tags || []).join(", ") || "-"}</td>
                 <td>{(row.issues || []).slice(0, 2).join("; ") || "-"}</td>

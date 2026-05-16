@@ -115,7 +115,7 @@ h3 {
 
 .tabs {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 8px;
   background: #e8edf5;
   padding: 6px;
@@ -344,6 +344,10 @@ button:disabled {
   animation: spin 0.8s linear infinite;
 }
 
+.loader strong {
+  color: #0f172a;
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -473,16 +477,24 @@ button:disabled {
   border: 1px solid #f0b44b;
   background: #fff7e6;
   color: #b86b00;
-  display: inline-grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: help;
   position: relative;
+  padding: 0;
+  line-height: 0;
 }
 
 .compact-info {
   width: 24px;
   height: 24px;
   justify-self: center;
+}
+
+.quality-info svg {
+  display: block;
+  flex: 0 0 auto;
 }
 
 .quality-popover {
@@ -497,8 +509,10 @@ button:disabled {
   border: 1px solid #f0b44b;
   border-radius: 8px;
   box-shadow: 0 16px 42px rgba(15, 23, 42, 0.18);
-  padding: 12px;
+  padding: 14px;
+  line-height: 1.35;
   text-align: left;
+  white-space: normal;
 }
 
 .quality-info:hover .quality-popover,
@@ -510,13 +524,18 @@ button:disabled {
 
 .quality-popover b {
   color: #8a5a00;
+  display: block;
+  font-size: 1rem;
+  line-height: 1.2;
+  margin-bottom: 2px;
 }
 
 .quality-popover em {
   display: grid;
-  gap: 4px;
+  gap: 3px;
   font-style: normal;
   font-weight: 800;
+  line-height: 1.25;
 }
 
 .quality-popover small {

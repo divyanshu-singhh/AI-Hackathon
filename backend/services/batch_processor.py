@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from agents.orchestrator_agent import process_image
+from services.cost_utils import format_cost, total_result_cost
 from services.report_exporter import create_csv_report
 
 
@@ -27,12 +28,15 @@ def build_batch_response(
         for path, file_name, expected_category in paths
     ]
     success = sum(1 for result in results if result.get("status") == "success")
+    total_cost = total_result_cost(results)
     report_name, report_url = create_csv_report(batch_id, results)
     return {
         "batch_id": batch_id,
         "total": len(results),
         "success": success,
         "failed": len(results) - success,
+        "total_estimated_cost": total_cost,
+        "total_estimated_cost_display": format_cost(total_cost),
         "report_name": report_name,
         "report_url": report_url,
         "results": results,

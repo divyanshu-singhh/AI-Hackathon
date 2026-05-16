@@ -7,6 +7,8 @@ class BatchResult(BaseModel):
     total: int
     success: int
     failed: int
+    total_estimated_cost: float = 0.0
+    total_estimated_cost_display: str = ""
     report_url: str | None = None
     report_name: str | None = None
     results: list[ImageResult] = Field(default_factory=list)

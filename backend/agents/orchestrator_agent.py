@@ -9,6 +9,7 @@ from agents.image_analysis_agent import analyze_image, extract_ocr_text, fallbac
 from agents.metadata_agent import fallback_metadata, generate_metadata
 from agents.quality_agent import summarize_quality
 from services.background_remover import remove_background
+from services.cost_utils import format_cost, parse_cost
 from services.image_processor import copy_to_uploads, normalize_image, resize_for_llm, validate_image_path
 from services.image_rebuilder import rebuild_catalog_image
 from services.progress_manager import model_type_for, progress_manager
@@ -108,6 +109,7 @@ def process_image(
             llm_image_path = resize_for_llm(uploaded_path, image_id)
             try:
                 ocr = extract_ocr_text(llm_image_path)
+                _add_llm_usage(result, ocr.get("_llm_meta", {}))
                 result["extracted_text"] = ocr.get("extracted_text", "")
                 result["ocr_text_blocks"] = ocr.get("text_blocks", [])
                 _emit_stage(
@@ -128,6 +130,7 @@ def process_image(
             llm_image_path = resize_for_llm(uploaded_path, image_id)
             try:
                 vision = analyze_image(llm_image_path)
+                _add_llm_usage(result, vision.get("_llm_meta", {}))
                 if result.get("extracted_text"):
                     vision["visible_text"] = result["extracted_text"]
                 _emit_stage(
@@ -153,6 +156,7 @@ def process_image(
             _emit_stage(progress_job_id, "metadata", "running", message="Generating catalog title, tags, and suggestions")
             try:
                 metadata = generate_metadata(vision, quality, quality_summary, expected_category)
+                _add_llm_usage(result, metadata.get("_llm_meta", {}))
                 _emit_stage(
                     progress_job_id,
                     "metadata",
@@ -200,6 +204,9 @@ def _base_result(image_id: str, file_name: str, stages: set[str]) -> dict[str, A
         "quality_breakdown": {},
         "rebuilt_quality_score": None,
         "rebuilt_quality_breakdown": {},
+        "llm_cost": 0.0,
+        "llm_cost_display": "",
+        "llm_calls": [],
         "issues": [],
         "suggestions": [],
         "raw_llm_analysis": {},
@@ -245,6 +252,31 @@ def _dedupe(items: list[Any]) -> list[str]:
             seen.add(text)
             output.append(text)
     return output
+
+def _add_llm_usage(result: dict[str, Any], llm_meta: dict[str, Any]) -> None:
+    cost = _parse_cost(llm_meta.get("estimated_cost", ""))
+    if cost > 0:
+        result["llm_cost"] = round(float(result.get("llm_cost", 0) or 0) + cost, 8)
+        result["llm_cost_display"] = _format_cost(result["llm_cost"])
+    result.setdefault("llm_calls", []).append(
+        {
+            "model_name": llm_meta.get("model_name", ""),
+            "model_group": llm_meta.get("model_group", ""),
+            "prompt_tokens": llm_meta.get("prompt_tokens", 0),
+            "completion_tokens": llm_meta.get("completion_tokens", 0),
+            "total_tokens": llm_meta.get("total_tokens", 0),
+            "estimated_cost": llm_meta.get("estimated_cost", ""),
+        }
+    )
+
+
+def _parse_cost(value: Any) -> float:
+    return parse_cost(value)
+
+
+def _format_cost(value: float) -> str:
+    return format_cost(value)
+
 
 def _emit_stage(
     job_id: str | None,

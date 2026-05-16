@@ -20,6 +20,9 @@ class ImageResult(BaseModel):
     quality_breakdown: dict[str, Any] = Field(default_factory=dict)
     rebuilt_quality_score: int | None = None
     rebuilt_quality_breakdown: dict[str, Any] = Field(default_factory=dict)
+    llm_cost: float = 0.0
+    llm_cost_display: str = ""
+    llm_calls: list[dict[str, Any]] = Field(default_factory=list)
     issues: list[str] = Field(default_factory=list)
     suggestions: list[str] = Field(default_factory=list)
     raw_llm_analysis: dict[str, Any] = Field(default_factory=dict)

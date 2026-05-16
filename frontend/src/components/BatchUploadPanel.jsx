@@ -29,11 +29,11 @@ export default function BatchUploadPanel({ stages, cropSize, onBatch, onProgress
     <section className="panel">
       <div className="section-heading">
         <Images size={18} />
-        <h2>Multi Image</h2>
+        <h2>Image</h2>
       </div>
       <label className="file-picker">
         <input type="file" multiple accept="image/png,image/jpeg,image/webp" onChange={(event) => setFiles(Array.from(event.target.files || []))} />
-        Select Images
+        Select Image
       </label>
       {files.length ? (
         <div className="file-list">
@@ -42,7 +42,7 @@ export default function BatchUploadPanel({ stages, cropSize, onBatch, onProgress
       ) : null}
       <button className="primary-button" type="button" disabled={!files.length || loading} onClick={submit}>
         <Play size={18} />
-        Process All
+        Process Image
       </button>
       {loading ? <Loader label={`Processing ${files.length} image${files.length === 1 ? "" : "s"}`} /> : null}
       {error ? <p className="error-line">{error}</p> : null}
