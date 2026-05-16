@@ -32,6 +32,8 @@ export default function App() {
       total: 1,
       success: result.status === "success" ? 1 : 0,
       failed: result.status === "success" ? 0 : 1,
+      report_name: result.report_name,
+      report_url: result.report_url,
       results: [result]
     });
     setControlsCollapsed(true);

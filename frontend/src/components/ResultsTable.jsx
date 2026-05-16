@@ -30,6 +30,7 @@ export default function ResultsTable({ batch }) {
               <th>Image</th>
               <th>Status</th>
               <th>Category</th>
+              <th>OCR Text</th>
               <th>Product Names</th>
               <th>Quality</th>
               <th>Objects</th>
@@ -44,6 +45,7 @@ export default function ResultsTable({ batch }) {
                 <td>{row.file_name}</td>
                 <td><span className={`pill ${row.status}`}>{row.status}</span></td>
                 <td>{row.category || "-"}</td>
+                <td>{row.extracted_text || ""}</td>
                 <td>{(row.product_name_suggestions || []).slice(0, 2).join(", ") || "-"}</td>
                 <td>{row.quality_score ?? "-"}</td>
                 <td>{(row.detected_objects || []).join(", ") || "-"}</td>

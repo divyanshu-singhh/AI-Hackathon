@@ -72,7 +72,7 @@ async def process_single_image(
 ) -> dict:
     try:
         temp_path = await save_upload_file(image)
-        return await asyncio.to_thread(
+        result = await asyncio.to_thread(
             process_image,
             temp_path,
             image.filename or temp_path.name,
@@ -80,6 +80,10 @@ async def process_single_image(
             progress_job_id=job_id,
             crop_size=parse_crop_size(crop_size),
         )
+        report_name, report_url = create_csv_report(result["image_id"], [result])
+        result["report_name"] = report_name
+        result["report_url"] = report_url
+        return result
     except Exception as exc:
         return {"status": "failed", "error": f"Unable to process image: {exc}"}
 
